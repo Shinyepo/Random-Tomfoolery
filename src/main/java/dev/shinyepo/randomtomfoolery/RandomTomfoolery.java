@@ -121,9 +121,8 @@ public class RandomTomfoolery
     @SubscribeEvent
     public void onLivingEatFood(LivingEntityUseItemEvent.Finish event) {
         var chance = generateRandom();
-        if (chance < 5) {
+        if (chance < 5 && event.getEntity() instanceof ServerPlayer player) {
             var item = event.getItem();
-            ServerPlayer player = (ServerPlayer) event.getEntity();
             if (item.is(Items.MILK_BUCKET)) {
                 player.sendSystemMessage(Component.literal("To mleko było skiśnięte"));
                 player.hurtServer((ServerLevel) player.level(), player.damageSources().generic(),1F);
