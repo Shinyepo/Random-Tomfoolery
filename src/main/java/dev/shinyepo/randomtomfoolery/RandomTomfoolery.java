@@ -2,47 +2,30 @@ package dev.shinyepo.randomtomfoolery;
 
 import it.unimi.dsi.fastutil.ints.IntList;
 import net.minecraft.Util;
-import net.minecraft.core.BlockPos;
+import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.damagesource.DamageSources;
-import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.MoverType;
-import net.minecraft.world.entity.animal.Animal;
-import net.minecraft.world.entity.animal.Chicken;
-import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.FireworkRocketEntity;
-import net.minecraft.world.food.Foods;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.DyeColor;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.FireworkExplosion;
 import net.minecraft.world.item.component.Fireworks;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.Tags;
-import net.neoforged.neoforge.event.entity.EntityEvent;
 import net.neoforged.neoforge.event.entity.living.*;
-import net.neoforged.neoforge.event.entity.player.CriticalHitEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.entity.player.*;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
@@ -110,10 +93,10 @@ public class RandomTomfoolery
     @SubscribeEvent
     public void onLivingChestOpen(PlayerContainerEvent.Open event) {
         var chance = generateMediumRandom();
-        if (chance < 2 && event.getContainer() instanceof ChestMenu) {
+        if (chance < 20 && event.getContainer() instanceof ChestMenu) {
             var level = event.getEntity().level();
             var player = event.getEntity();
-            level.playSound(null, player.blockPosition(), SoundEvents.CREEPER_PRIMED, SoundSource.AMBIENT, 1.0f, 1.0f);
+            level.playSound(null, player.blockPosition(), SoundEvents.GHAST_SCREAM, SoundSource.AMBIENT, 1.0f, 1.0f);
             logJackpot(player,"opening a chest");
         }
     }
@@ -130,8 +113,8 @@ public class RandomTomfoolery
                 player.addEffect(new MobEffectInstance(MobEffects.NAUSEA,200));
                 logJackpot(player,"drinking milk");
             }
-            if (item.is(Items.APPLE) || item.is(Items.CARROT) || item.is(Items.BREAD)) {
-                player.sendSystemMessage(Component.literal("Połamałeś jedynki na tym"));
+            if (item.is(Items.APPLE) || item.is(Items.CARROT) || item.is(Items.BREAD) || item.is(Items.COOKED_BEEF) || item.is(Items.COOKED_CHICKEN) || item.is(Items.COOKED_PORKCHOP) || item.is(Items.COOKED_MUTTON)) {
+                player.sendSystemMessage(Component.literal("Ugryzłeś coś twardego i połamałeś jedynki"));
                 player.hurtServer((ServerLevel) player.level(), player.damageSources().generic(),4F);
                 player.addEffect(new MobEffectInstance(MobEffects.SLOWNESS,100));
                 System.out.println(player.getName());
@@ -182,6 +165,36 @@ public class RandomTomfoolery
                 logJackpot(serverPlayer,"destroying farmland");
             }
         }
+    }
+
+    @SubscribeEvent
+    public void onWakeUp(PlayerWakeUpEvent event) {
+        var chance = generateRandom();
+        if (chance < 25 && event.getEntity() instanceof ServerPlayer serverPlayer) {
+            var level = serverPlayer.level();
+            var position = serverPlayer.position();
+            var zombie1 = new Zombie(EntityType.ZOMBIE,level);
+            var zombie2 = new Zombie(EntityType.ZOMBIE,level);
+            var zombie3 = new Zombie(EntityType.ZOMBIE,level);
+
+            zombie1.removeFreeWill();
+            zombie2.removeFreeWill();
+            zombie3.removeFreeWill();
+
+            zombie1.setPos(new Vec3(position.x+2,position.y, position.z));
+            zombie2.setPos(new Vec3(position.x,position.y, position.z+2));
+            zombie3.setPos(new Vec3(position.x+2,position.y, position.z+2));
+
+            zombie1.lookAt(EntityAnchorArgument.Anchor.EYES,serverPlayer.position());
+            zombie2.lookAt(EntityAnchorArgument.Anchor.EYES,serverPlayer.position());
+            zombie3.lookAt(EntityAnchorArgument.Anchor.EYES,serverPlayer.position());
+
+            level.addFreshEntity(zombie1);
+            level.addFreshEntity(zombie2);
+            level.addFreshEntity(zombie3);
+            serverPlayer.sendSystemMessage(Component.literal("NAD TWOIM SPIACYM CIALEM MASTURBOWALY SIE ZOMBIAKI!!!!"));
+            logJackpot(serverPlayer,"waking up");
+            }
 
     }
 
