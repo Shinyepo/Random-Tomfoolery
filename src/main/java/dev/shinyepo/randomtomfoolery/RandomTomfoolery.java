@@ -137,7 +137,6 @@ public class RandomTomfoolery {
                 player.sendSystemMessage(Component.literal("Ugryzłeś coś twardego i połamałeś jedynki"));
                 player.hurtServer((ServerLevel) player.level(), player.damageSources().generic(), 4F);
                 player.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 100));
-                System.out.println(player.getName());
                 logJackpot(player, "eating " + item.getDisplayName());
             }
         }
@@ -294,8 +293,6 @@ public class RandomTomfoolery {
                             var player = ctx.getSource().getPlayer();
                             var homePos = player.position();
                             var dimension = player.level().dimension().location();
-
-                            System.out.println(player.level().dimension().location());
 
                             if (dimension.toString().equals("minecraft:overworld")) {
                                 player.setData(RTAttachments.OVERWORLD_HOME, new BlockPos((int)homePos.x,(int) homePos.y,(int) homePos.z));
