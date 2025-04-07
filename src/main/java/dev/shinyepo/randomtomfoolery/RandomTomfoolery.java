@@ -158,7 +158,7 @@ public class RandomTomfoolery {
     public void onZombieDeath(LivingDeathEvent event) {
         var entity = event.getEntity();
         var chance = generateRandom();
-        if (chance < 5 && entity instanceof Zombie parent && !parent.isBaby() && event.getSource().getEntity() instanceof Player player) {
+        if (chance < 5 && entity instanceof Zombie parent && !parent.isBaby() && event.getSource().getEntity() instanceof ServerPlayer player) {
             var smallZombie1 = new Zombie(entity.level());
             var smallZombie2 = new Zombie(entity.level());
             smallZombie1.setBaby(true);
@@ -168,6 +168,7 @@ public class RandomTomfoolery {
 
             entity.level().addFreshEntity(smallZombie1);
             entity.level().addFreshEntity(smallZombie2);
+            player.sendSystemMessage(Component.literal("TEN ZOMBIE BYŁ W CIĄŻY. TY POTWORZE!!"));
             logJackpot(player, "killing a zombie");
         }
     }
@@ -259,7 +260,7 @@ public class RandomTomfoolery {
 
 
     public static void askForConfirmation(ServerPlayer owner, ServerPlayer target, Runnable onConfirm) {
-        var uuid = target.getUUID();
+        var uuid = owner.getUUID();
 
         PENDINGCONFIRMATIONS.put(uuid, onConfirm);
 
