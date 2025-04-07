@@ -6,6 +6,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -27,7 +28,6 @@ import net.minecraft.world.item.*;
 import net.minecraft.world.item.component.FireworkExplosion;
 import net.minecraft.world.item.component.Fireworks;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.living.*;
@@ -68,6 +68,7 @@ public class RandomTomfoolery {
         // Note that this is necessary if and only if we want *this* class (ExampleMod) to respond directly to events.
         // Do not add this line if there are no @SubscribeEvent-annotated functions in this class, like onServerStarting() below.
         NeoForge.EVENT_BUS.register(this);
+        RTAttachments.ATTACHMENT_TYPES.register(modEventBus);
 
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
@@ -94,6 +95,19 @@ public class RandomTomfoolery {
 
     private int generateBiggerRandom() {
         return RANDOM.nextInt(10001);
+    }
+
+    @SubscribeEvent
+    public void onPlayerDeath(PlayerEvent.Clone event) {
+        if (event.isWasDeath() && event.getOriginal().hasData(RTAttachments.OVERWORLD_HOME)) {
+            event.getEntity().setData(RTAttachments.OVERWORLD_HOME, event.getOriginal().getData(RTAttachments.OVERWORLD_HOME));
+        }
+        if (event.isWasDeath() && event.getOriginal().hasData(RTAttachments.END_HOME)) {
+            event.getEntity().setData(RTAttachments.END_HOME, event.getOriginal().getData(RTAttachments.END_HOME));
+        }
+        if (event.isWasDeath() && event.getOriginal().hasData(RTAttachments.NETHER_HOME)) {
+            event.getEntity().setData(RTAttachments.NETHER_HOME, event.getOriginal().getData(RTAttachments.NETHER_HOME));
+        }
     }
 
     @SubscribeEvent
@@ -275,6 +289,59 @@ public class RandomTomfoolery {
     @SubscribeEvent
     public void registerCommands(RegisterCommandsEvent event) {
         event.getDispatcher().register(
+                Commands.literal("sethome")
+                        .executes(ctx -> {
+                            var player = ctx.getSource().getPlayer();
+                            var homePos = player.position();
+                            var dimension = player.level().dimension().location();
+
+                            System.out.println(player.level().dimension().location());
+
+                            if (dimension.toString().equals("minecraft:overworld")) {
+                                player.setData(RTAttachments.OVERWORLD_HOME, new BlockPos((int)homePos.x,(int) homePos.y,(int) homePos.z));
+                            } else if (dimension.toString().equals("minecraft:the_nether")) {
+                                player.setData(RTAttachments.NETHER_HOME, new BlockPos((int)homePos.x,(int) homePos.y,(int) homePos.z));
+                            } else if (dimension.toString().equals("minecraft:the_end")) {
+                                player.setData(RTAttachments.END_HOME, new BlockPos((int)homePos.x,(int) homePos.y,(int) homePos.z));
+                            } else {
+                                player.sendSystemMessage(Component.literal("Coś poszło nie tak :/"));
+                                return 0;
+                            }
+                            player.sendSystemMessage(Component.literal("Zapisałeś nową pozycje dla /home"));
+                            return 1;
+                        })
+        );
+
+        event.getDispatcher().register(
+                Commands.literal("home")
+                        .executes(ctx -> {
+                            var player = ctx.getSource().getPlayer();
+                            var dimension = player.level().dimension().location();
+                            var homePos = new BlockPos(0,0,0);
+                            if (dimension.toString().equals("minecraft:overworld")) {
+                                homePos = player.getData(RTAttachments.OVERWORLD_HOME);
+                            } else if (dimension.toString().equals("minecraft:the_nether")) {
+                                homePos = player.getData(RTAttachments.NETHER_HOME);
+                            } else if (dimension.toString().equals("minecraft:the_end")) {
+                                homePos = player.getData(RTAttachments.END_HOME);
+                            } else {
+                                player.sendSystemMessage(Component.literal("Coś poszło nie tak :/"));
+                                return 0;
+                            }
+
+                            if (!homePos.equals(new BlockPos(0,0,0))) {
+                                var center = homePos.getCenter();
+                                player.teleportTo(center.x(), center.y(), center.z());
+                                player.sendSystemMessage(Component.literal("Przeniosłeś się do domu"));
+                                return 1;
+                            }
+                            player.sendSystemMessage(Component.literal("Najpierw ustaw lokalizację używając /sethome"));
+
+                            return 0;
+                        })
+        );
+
+        event.getDispatcher().register(
                 Commands.literal("tpr")
                         .then(Commands.argument("target", EntityArgument.player())
                                 .executes(ctx -> {
@@ -285,12 +352,21 @@ public class RandomTomfoolery {
                                         owner.sendSystemMessage(Component.literal("Nie mozesz teleportowac sie do siebie."));
                                         return 0;
                                     }
+
+                                    var ownerWorld = owner.level().dimensionType();
+                                    var targetWorld = target.level().dimensionType();
+                                    if (ownerWorld != targetWorld) {
+                                        owner.sendSystemMessage(Component.literal("Nie możesz teleportować się do gracza w innym wymiarze"));
+                                        return 0;
+                                    }
+
                                     assert owner != null;
                                     askForConfirmation(owner, target, () -> {
                                         var targetPos = target.position();
                                         owner.teleportTo(targetPos.x, targetPos.y, targetPos.z);
                                         owner.sendSystemMessage(Component.literal("Prośba o teleport została zaakceptowana."));
                                     });
+                                    owner.sendSystemMessage(Component.literal("Wysłałeś prośbę o teleport do " + target.getGameProfile().getName()));
                                     return 1;
                                 }))
         );
