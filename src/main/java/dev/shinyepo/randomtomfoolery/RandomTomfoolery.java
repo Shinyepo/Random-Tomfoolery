@@ -281,10 +281,10 @@ public class RandomTomfoolery {
                                     var owner = ctx.getSource().getPlayer();
                                     var target = EntityArgument.getPlayer(ctx, "target");
 
-//                                    if (owner.getGameProfile().getName().equalsIgnoreCase(target.getGameProfile().getName())) {
-//                                        owner.sendSystemMessage(Component.literal("Nie mozesz teleportowac sie do siebie."));
-//                                        return 0;
-//                                    }
+                                    if (owner.getGameProfile().getName().equalsIgnoreCase(target.getGameProfile().getName())) {
+                                        owner.sendSystemMessage(Component.literal("Nie mozesz teleportowac sie do siebie."));
+                                        return 0;
+                                    }
                                     assert owner != null;
                                     askForConfirmation(owner, target, () -> {
                                         var targetPos = target.position();
