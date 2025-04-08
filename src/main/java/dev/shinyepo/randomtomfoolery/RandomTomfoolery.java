@@ -1,5 +1,7 @@
 package dev.shinyepo.randomtomfoolery;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
+import dev.shinyepo.randomtomfoolery.data.ChunkLoaderSaveData;
 import it.unimi.dsi.fastutil.ints.IntList;
 import net.minecraft.Util;
 import net.minecraft.commands.CommandSourceStack;
@@ -27,6 +29,7 @@ import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.*;
 import net.minecraft.world.item.component.FireworkExplosion;
 import net.minecraft.world.item.component.Fireworks;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -296,11 +299,11 @@ public class RandomTomfoolery {
                             var dimension = player.level().dimension().location();
 
                             if (dimension.toString().equals("minecraft:overworld")) {
-                                player.setData(RTAttachments.OVERWORLD_HOME, new BlockPos((int)homePos.x,(int) homePos.y,(int) homePos.z));
+                                player.setData(RTAttachments.OVERWORLD_HOME, new BlockPos((int) homePos.x, (int) homePos.y, (int) homePos.z));
                             } else if (dimension.toString().equals("minecraft:the_nether")) {
-                                player.setData(RTAttachments.NETHER_HOME, new BlockPos((int)homePos.x,(int) homePos.y,(int) homePos.z));
+                                player.setData(RTAttachments.NETHER_HOME, new BlockPos((int) homePos.x, (int) homePos.y, (int) homePos.z));
                             } else if (dimension.toString().equals("minecraft:the_end")) {
-                                player.setData(RTAttachments.END_HOME, new BlockPos((int)homePos.x,(int) homePos.y,(int) homePos.z));
+                                player.setData(RTAttachments.END_HOME, new BlockPos((int) homePos.x, (int) homePos.y, (int) homePos.z));
                             } else {
                                 player.sendSystemMessage(Component.literal("Coś poszło nie tak :/"));
                                 return 0;
@@ -315,7 +318,7 @@ public class RandomTomfoolery {
                         .executes(ctx -> {
                             var player = ctx.getSource().getPlayer();
                             var dimension = player.level().dimension().location();
-                            var homePos = new BlockPos(0,0,0);
+                            var homePos = new BlockPos(0, 0, 0);
                             if (dimension.toString().equals("minecraft:overworld")) {
                                 homePos = player.getData(RTAttachments.OVERWORLD_HOME);
                             } else if (dimension.toString().equals("minecraft:the_nether")) {
@@ -327,7 +330,7 @@ public class RandomTomfoolery {
                                 return 0;
                             }
 
-                            if (!homePos.equals(new BlockPos(0,0,0))) {
+                            if (!homePos.equals(new BlockPos(0, 0, 0))) {
                                 var center = homePos.getCenter();
                                 player.teleportTo(center.x(), center.y(), center.z());
                                 player.sendSystemMessage(Component.literal("Przeniosłeś się do domu"));
@@ -406,6 +409,94 @@ public class RandomTomfoolery {
                                     return 1;
                                 }))
         );
+
+        event.getDispatcher().register(
+                Commands.literal("chunkload")
+                        .then(Commands.argument("option", StringArgumentType.word())
+                                .executes(ctx -> {
+                                    var option = StringArgumentType.getString(ctx, "option");
+                                    ServerPlayer player = ctx.getSource().getPlayer();
+                                    var level = (ServerLevel) player.level();
+                                    var playerPos = player.position();
+                                    var chunkBlockPos = new BlockPos((int) playerPos.x, (int) playerPos.y, (int) playerPos.z);
+                                    var chunk = level.getChunk(chunkBlockPos);
+                                    var chunkPos = chunk.getPos();
+                                    var savedData = ChunkLoaderSaveData.getOrCreate(level);
+                                    if (option.equalsIgnoreCase("set")) {
+                                        var userChunks = getPlayerDimensionChunkList(player);
+                                        if (!userChunks.isEmpty()) {
+                                            var isLoaded = userChunks.contains(chunkPos.toLong());
+                                            var levelChunk = level.getForceLoadedChunks().longStream().filter(x -> x == chunkPos.toLong()).findFirst();
+                                            if (isLoaded || levelChunk.isPresent()) {
+                                                player.sendSystemMessage(Component.literal("Ten chunk już jest zapisany w pamięci"));
+                                                return 0;
+                                            }
+                                        }
+                                        userChunks.add(chunkPos.toLong());
+                                        savedData.addChunk(level.dimension(),chunkPos);
+                                        setPlayerDimensionChunkList(player, userChunks);
+                                        level.setChunkForced(chunkPos.x, chunkPos.z, true);
+                                        player.sendSystemMessage(Component.literal("Zapisano chunk w pamięci"));
+                                        return 1;
+                                    } else if (option.equalsIgnoreCase("list")) {
+                                        var userChunks = getPlayerDimensionChunkList(player);
+                                        if (!userChunks.isEmpty()) {
+                                            player.sendSystemMessage(Component.literal("Zapisane w pamięci chunki:"));
+                                            userChunks.forEach(x -> {
+                                                var pos = new ChunkPos(x).getWorldPosition();
+                                                player.sendSystemMessage(Component.literal("x = " + (pos.getX()+8) + ", z = " + (pos.getZ() +8)));
+                                            });
+                                        } else {
+                                            player.sendSystemMessage(Component.literal("Nie masz zapisanych chunków w tym wymiarze."));
+                                        }
+                                        return 1;
+                                    } else if (option.equalsIgnoreCase("check")) {
+                                        var foundChunk = level.getForceLoadedChunks().longStream().filter(x -> x == chunkPos.toLong()).findFirst();
+                                        if (foundChunk.isEmpty()) {
+                                            player.sendSystemMessage(Component.literal("Ten chunk nie jest zapisany w pamięci."));
+                                        } else {
+                                            player.sendSystemMessage(Component.literal("Ten chunk jest zapisany w pamięci."));
+                                        }
+                                        return 1;
+                                    } else if (option.equalsIgnoreCase("remove")) {
+                                        var userChunks = getPlayerDimensionChunkList(player);
+                                        if (userChunks.contains(chunkPos.toLong())) {
+                                            userChunks.remove(chunkPos.toLong());
+                                            level.setChunkForced(chunk.getPos().x, chunk.getPos().z, false);
+                                            setPlayerDimensionChunkList(player, userChunks);
+                                            savedData.removeChunk(level.dimension(),chunkPos);
+                                            player.sendSystemMessage(Component.literal("Usunięto chunk z pamięci."));
+                                        } else {
+                                            player.sendSystemMessage(Component.literal("Ten chunk nie jest zapisany w pamięci lub nie jest Twój."));
+                                        }
+
+                                    }
+                                    return 1;
+                                }))
+        );
+    }
+
+    private HashSet<Long> getPlayerDimensionChunkList(ServerPlayer player) {
+        var dimension = player.level().dimension().location().toString();
+        if (dimension.equals("minecraft:overworld")) {
+            return player.getData(RTAttachments.OVERWORLD_CHUNKS);
+        } else if (dimension.equals("minecraft:the_nether")) {
+            return player.getData(RTAttachments.NETHER_CHUNKS);
+        } else if (dimension.equals("minecraft:the_end")) {
+            return player.getData(RTAttachments.END_CHUNKS);
+        }
+        return new HashSet<>();
+    }
+
+    private void setPlayerDimensionChunkList(ServerPlayer player, HashSet<Long> chunkList) {
+        var dimension = player.level().dimension().location().toString();
+        if (dimension.equals("minecraft:overworld")) {
+            player.setData(RTAttachments.OVERWORLD_CHUNKS, chunkList);
+        } else if (dimension.equals("minecraft:the_nether")) {
+            player.setData(RTAttachments.NETHER_CHUNKS, chunkList);
+        } else if (dimension.equals("minecraft:the_end")) {
+            player.setData(RTAttachments.END_CHUNKS, chunkList);
+        }
     }
 
     private ServerPlayer findPlayerFromName(CommandSourceStack source, String name) {
@@ -415,7 +506,34 @@ public class RandomTomfoolery {
     // You can use SubscribeEvent and let the Event Bus discover methods to call
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
+        ServerLevel overworld = event.getServer().getLevel(Level.OVERWORLD);
+        ServerLevel nether = event.getServer().getLevel(Level.NETHER);
+        ServerLevel end = event.getServer().getLevel(Level.END);
+
+        if (overworld != null) {
+            loadChunksAndKeepLoaded(overworld);
+            LOGGER.info("Loaded " + overworld.getForceLoadedChunks().size() + " overworld chunks");
+        }
+        if (nether != null) {
+            loadChunksAndKeepLoaded(nether);
+            LOGGER.info("Loaded " + nether.getForceLoadedChunks().size() + " nether chunks");
+        }
+        if (end != null) {
+            loadChunksAndKeepLoaded(end);
+            LOGGER.info("Loaded " + end.getForceLoadedChunks().size() + " end chunks");
+        }
         // Do something when the server starts
         LOGGER.info("Random Tomfoolery is UP AND READY!");
+    }
+
+    public static void loadChunksAndKeepLoaded(ServerLevel level) {
+        ChunkLoaderSaveData savedData = ChunkLoaderSaveData.getOrCreate(level);
+        var chunks = savedData.getDimensionChunks(level.dimension());
+        if (!chunks.isEmpty()) {
+            for (var chunk : chunks) {
+                var chunkpos = new ChunkPos(ChunkPos.getX(chunk), ChunkPos.getZ(chunk));
+                level.setChunkForced(chunkpos.x, chunkpos.z, true);
+            }
+        }
     }
 }
